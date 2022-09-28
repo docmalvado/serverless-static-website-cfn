@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  project:
+    Type: String
+    Description: Project's name
+Resources:
+  GitConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: !Sub ${project}-git-connection
+      ProviderType: GitHub
+Outputs:
+  gitConnectionARN:
+    Value: !Ref GitConnection
+      

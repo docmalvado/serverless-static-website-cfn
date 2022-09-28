@@ -1,0 +1,14 @@
+Parameters:
+  bucketName:
+    Type: String
+    Description: Bucket Name
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref bucketName
+Outputs:
+  bucketName:
+    Value: !Ref S3Bucket
+  bucketDomainName:
+    Value: !GetAtt S3Bucket.DomainName

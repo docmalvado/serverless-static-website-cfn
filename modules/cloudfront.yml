@@ -1,0 +1,117 @@
+Parameters:
+  bucketName:
+    Type: String
+  bucketDomainName:
+    Type: String
+  originPath:
+    Type: String
+    Default: ''
+  domain:
+    Type: String
+  subdomain:
+    Type: String
+  certificateARN:
+    Type: String
+  hostedZoneId:
+    Type: String
+Conditions:
+  noOriginPath: !Or
+    - !Equals 
+      - !Ref originPath
+      - '/'
+    - !Equals 
+      - !Ref originPath
+      - ''
+Resources:  
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig: 
+          Name: OAC
+          Description: Access to S3
+          OriginAccessControlOriginType: s3
+          SigningBehavior: always
+          SigningProtocol: sigv4
+
+  ReadPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: bucketName
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Action: s3:GetObject
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:s3:::${bucketName}/*
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition: 
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: "/error.html"
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: true
+          DefaultTTL: 3600
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            QueryString: false
+          MaxTTL: 86400
+          MinTTL: 60
+          TargetOriginId: S3Bucket
+          ViewerProtocolPolicy: 'redirect-to-https'
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - Id: S3Bucket
+            OriginAccessControlId: !Ref OriginAccessControl
+            DomainName: !Ref bucketDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginPath: !If [noOriginPath, !Ref AWS::NoValue, !Ref originPath]
+        PriceClass: PriceClass_All
+        Aliases: 
+          - !Sub "${subdomain}.${domain}"
+        ViewerCertificate:
+          AcmCertificateArn: !Ref certificateARN
+          MinimumProtocolVersion: TLSv1.2_2018
+          SslSupportMethod: sni-only
+
+  RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+            - CloudFrontDistribution
+            - DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+      Comment: website hosting
+      HostedZoneId: !Ref hostedZoneId
+      Name: !Sub "${subdomain}.${domain}"
+      Type: A
+
+Outputs:
+  distributionId:
+    Value: !Ref CloudFrontDistribution
+  distributionDomain:
+    Value: !GetAtt CloudFrontDistribution.DomainName

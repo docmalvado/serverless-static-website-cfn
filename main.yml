@@ -1,0 +1,144 @@
+Parameters:
+  project:
+    Type: String
+    Description: Project's name
+    MinLength: "4"
+    MaxLength: "12"
+    AllowedPattern: "^([a-z0-9]+(-[a-z0-9]+)*)+$"
+    ConstraintDescription: Enter a valid project name (only letters, numbers and hyphens)
+  environment:
+    Type: String
+    Description: Project's environment
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+  cfnBucketName:
+    Type: String
+    Description: Bucket that store cfn modules
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: "(?!(^((2(5[0-5]|[0-4][0-9])|[01]?[0-9]{1,2})\\.){3}(2(5[0-5]|[0-4][0-9])|[01]?[0-9]{1,2})$|^xn--|.+-s3alias$))^[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9]$"
+    ConstraintDescription: Enter a valid bucket name
+  frontendRepository:
+    Type: String
+    Description: "E.g: owner/repo_name"
+    AllowedPattern: "^([\\w,\\-,\\_]+)/([\\w,\\-,\\_]+)$"
+    ConstraintDescription: Enter a valid repo
+  repositoryBranch:
+    Type: String
+    Default: main
+    Description: Branch to deploy
+    AllowedPattern: "^(?!/|.*(?:[/.]\\.|//|@\\{|\\\\))[^\\0400177~^:?*\\[]+(?<!\\.lock)(?<![/.])$"
+    ConstraintDescription: Enter a valid branch name
+  frontendSubdomain:
+    Type: String
+    Description: "Subdomain for the frontend, E.g: www"
+    Default: www
+    MinLength: "1"
+    AllowedPattern: "^[a-z0-9]{1,}$"
+    ConstraintDescription: Enter valid subdomain (only letters and numbers, no spaces, no special characters)
+  hostedZoneName:
+    Type: String
+    Description: "E.g: mysite.com (Must exist in Route53)"
+    MinLength: "6"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}$"
+    ConstraintDescription: Enter a valid domain name
+  hostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: "Existing hosted zone id"
+  
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: Project Information
+        Parameters:
+          - project
+          - environment
+      - Label:
+          default: Repo information
+        Parameters:
+          - frontendRepository
+          - repositoryBranch
+      - Label:
+          default: Domain information
+        Parameters:
+          - hostedZoneName
+          - hostedZoneId
+          - frontendSubdomain
+      - Label:
+          default: Bucket information
+        Parameters:
+          - cfnBucketName
+    ParameterLabels:
+      project:
+        default: "Project's name:"
+      environment:
+        default: "Project's environment:"
+      cfnBucketName:
+        default: "Cloudformation bucket:"
+      frontendRepository:
+        default: "Website repository:"
+      repositoryBranch:
+        default: "Repository branch:"
+      frontendSubdomain:
+        default: "Subdomain:"
+      hostedZoneName:
+        default: "Domain name:"
+Resources:
+  WebsiteBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/s3.yml
+      Parameters: 
+        bucketName: !Sub ${project}-${environment}-website-${AWS::Region}
+
+  PipelineBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/s3.yml
+      Parameters: 
+        bucketName: !Sub ${project}-${environment}-pipeline-${AWS::Region}
+  
+  Certificate:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/acm.yml
+      Parameters: 
+        hostedZoneName: !Ref hostedZoneName
+        hostedZoneId: !Ref hostedZoneId
+
+  GitConnection:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/codestar.yml
+      Parameters: 
+        project: !Ref project
+
+  Distribution:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/cloudfront.yml
+      Parameters: 
+        bucketName: !GetAtt WebsiteBucket.Outputs.bucketName
+        bucketDomainName: !GetAtt WebsiteBucket.Outputs.bucketDomainName
+        domain: !Ref hostedZoneName
+        subdomain: !Ref frontendSubdomain
+        hostedZoneId: !Ref hostedZoneId
+        certificateARN: !GetAtt Certificate.Outputs.certificateARN
+
+  Pipeline:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/main.yml
+      Parameters: 
+        project: !Ref project
+        environment: !Ref environment
+        cfnBucketName: !Ref cfnBucketName
+        frontendRepository: !Ref frontendRepository
+        repositoryBranch: !Ref repositoryBranch
+        deploymentBucketName: !GetAtt WebsiteBucket.Outputs.bucketName
+        artifactsBucketName: !GetAtt PipelineBucket.Outputs.bucketName
+        gitConnectionARN: !GetAtt GitConnection.Outputs.gitConnectionARN

@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: IAM Resources
+Parameters:
+  project:
+    Type: String
+  environment:
+    Type: String
+    Description: Project's environment
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+  artifactsBucketName:
+    Type: String
+  deploymentBucketName:
+    Type: String
+Resources:
+  BuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+        Version: 2012-10-17
+      Path: /
+      Policies:
+        - PolicyName: logsAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Effect: Allow
+                Resource: '*'
+
+  PipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+        Version: 2012-10-17
+      Path: /
+      Policies:
+        - PolicyName: codeBuildPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                  - 'codebuild:BatchGetBuildBatches'
+                  - 'codebuild:StartBuildBatch'
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: deployPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - s3:Put*
+                Effect: Allow
+                Resource:
+                  - !Sub 'arn:aws:s3:::${deploymentBucketName}'
+                  - !Sub 'arn:aws:s3:::${deploymentBucketName}/*'
+        - PolicyName: ecrAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'ecr:DescribeImages'
+                Effect: Allow
+                Resource: '*'
+
+  CommonPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${project}-${environment}-common-policies
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - s3:Put*
+              - s3:Get*
+              - s3:List*
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:aws:s3:::${artifactsBucketName}'
+              - !Sub 'arn:aws:s3:::${artifactsBucketName}/*'
+          - Action:
+              - 'codestar-connections:UseConnection'
+            Effect: Allow
+            Resource: '*'
+      Roles: 
+        - !Ref BuildRole
+        - !Ref PipelineRole
+
+Outputs:
+  buildRoleArn:
+    Value: !GetAtt 
+      - BuildRole
+      - Arn
+  pipelineRoleArn:
+    Value: !GetAtt 
+      - PipelineRole
+      - Arn
+  
+  

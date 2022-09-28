@@ -1,0 +1,63 @@
+Parameters:
+  project:
+    Type: String
+    Description: Project's name
+    MinLength: "4"
+    MaxLength: "12"
+    AllowedPattern: ^(\d|\w)+$
+  environment:
+    Type: String
+    Description: Project's environment
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+  cfnBucketName:
+    Type: String
+    Description: Bucket that store cfn modules
+  frontendRepository:
+    Type: String
+  repositoryBranch:
+    Type: String
+    Default: main
+  deploymentBucketName:
+    Type: String
+  artifactsBucketName:
+    Type: String
+  gitConnectionARN:
+    Type: String
+Resources:
+  Permissions:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/iam.yml
+      Parameters: 
+        project: !Ref project
+        environment: !Ref environment
+        artifactsBucketName: !Ref artifactsBucketName
+        deploymentBucketName: !Ref deploymentBucketName
+
+  BuildProject:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/codebuild.yml
+      Parameters: 
+        project: !Ref project
+        environment: !Ref environment
+        codeBuildRoleArn: !GetAtt Permissions.Outputs.buildRoleArn
+        
+  PipelineProject:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/codepipeline.yml
+      Parameters: 
+        project: !Ref project
+        environment: !Ref environment
+        artifactsBucketName: !Ref artifactsBucketName
+        repositoryName: !Ref frontendRepository
+        repositoryBranch: !Ref repositoryBranch
+        codePipelineRoleArn: !GetAtt Permissions.Outputs.pipelineRoleArn
+        gitConnectionArn: !Ref gitConnectionARN
+        buildProjectName: !GetAtt BuildProject.Outputs.codeBuildProjectName
+        deploymentBucketName: !Ref deploymentBucketName

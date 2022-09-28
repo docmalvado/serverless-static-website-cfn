@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  hostedZoneName:
+    Type: String
+  hostedZoneId:
+    Type: String
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub "*.${hostedZoneName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref hostedZoneName
+          HostedZoneId: !Ref hostedZoneId
+Outputs:
+  certificateARN:
+    Value: !Ref Certificate
