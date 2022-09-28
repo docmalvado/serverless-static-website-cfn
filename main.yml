@@ -87,6 +87,8 @@ Metadata:
         default: "Subdomain:"
       hostedZoneName:
         default: "Domain name:"
+      hostedZoneId:
+        default: "Hosted zone Id:"
 Resources:
   WebsiteBucket:
     Type: AWS::CloudFormation::Stack
