@@ -32,6 +32,13 @@ Parameters:
     Description: Branch to deploy
     AllowedPattern: "^(?!/|.*(?:[/.]\\.|//|@\\{|\\\\))[^\\0400177~^:?*\\[]+(?<!\\.lock)(?<![/.])$"
     ConstraintDescription: Enter a valid branch name
+  startPipelineOnChange:
+    Type: String
+    Description: "Automatically start pipeline on commit"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   frontendSubdomain:
     Type: String
     Description: "Subdomain for the frontend, E.g: www"
@@ -62,6 +69,7 @@ Metadata:
         Parameters:
           - frontendRepository
           - repositoryBranch
+          - startPipelineOnChange
       - Label:
           default: Domain information
         Parameters:
@@ -83,6 +91,8 @@ Metadata:
         default: "Website repository:"
       repositoryBranch:
         default: "Repository branch:"
+      startPipelineOnChange:
+        default: "Start pipeline on change?"
       frontendSubdomain:
         default: "Subdomain:"
       hostedZoneName:
@@ -138,6 +148,7 @@ Resources:
       Parameters: 
         project: !Ref project
         environment: !Ref environment
+        startOnChange: !Ref startPipelineOnChange
         cfnBucketName: !Ref cfnBucketName
         frontendRepository: !Ref frontendRepository
         repositoryBranch: !Ref repositoryBranch

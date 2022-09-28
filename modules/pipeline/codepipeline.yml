@@ -12,6 +12,13 @@ Parameters:
       - dev
       - qa
       - prod
+  startOnChange:
+    Type: String
+    Description: Start pipeline on git commit
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   artifactsBucketName:
     Type: String
   repositoryName:
@@ -51,7 +58,7 @@ Resources:
                 FullRepositoryId: !Ref repositoryName
                 BranchName: !Ref repositoryBranch
                 OutputArtifactFormat: "CODEBUILD_CLONE_REF"
-                DetectChanges: false
+                DetectChanges: !Ref startOnChange
               RunOrder: 1
               OutputArtifacts:
                 - Name: Source

@@ -13,6 +13,13 @@ Parameters:
       - dev
       - qa
       - prod
+  startOnChange:
+    Type: String
+    Description: Start pipeline on git commit
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   cfnBucketName:
     Type: String
     Description: Bucket that store cfn modules
@@ -54,6 +61,7 @@ Resources:
       Parameters: 
         project: !Ref project
         environment: !Ref environment
+        startOnChange: !Ref startOnChange
         artifactsBucketName: !Ref artifactsBucketName
         repositoryName: !Ref frontendRepository
         repositoryBranch: !Ref repositoryBranch
