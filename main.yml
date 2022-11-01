@@ -21,6 +21,14 @@ Parameters:
     MaxLength: 63
     AllowedPattern: "(?!(^((2(5[0-5]|[0-4][0-9])|[01]?[0-9]{1,2})\\.){3}(2(5[0-5]|[0-4][0-9])|[01]?[0-9]{1,2})$|^xn--|.+-s3alias$))^[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9]$"
     ConstraintDescription: Enter a valid bucket name
+  gitProvider:
+    Type: String
+    Description: Select git provider from list
+    Default: GitHub
+    AllowedValues:
+      - GitHub
+      - Bitbucket
+      - GitHubEnterpriseServer
   frontendRepository:
     Type: String
     Description: "E.g: owner/repo_name"
@@ -39,6 +47,14 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
+  buildInstanceComputeType:
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+      - BUILD_GENERAL1_2XLARGE
   frontendSubdomain:
     Type: String
     Description: "Subdomain for the frontend, E.g: www"
@@ -46,15 +62,22 @@ Parameters:
     MinLength: "1"
     AllowedPattern: "^[a-z0-9]{1,}$"
     ConstraintDescription: Enter valid subdomain (only letters and numbers, no spaces, no special characters)
-  hostedZoneName:
+  rootHostedZoneName:
     Type: String
     Description: "E.g: mysite.com (Must exist in Route53)"
     MinLength: "6"
     AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}$"
     ConstraintDescription: Enter a valid domain name
-  hostedZoneId:
+  rootHostedZoneId:
     Type: AWS::Route53::HostedZone::Id
     Description: "Existing hosted zone id"
+  useEnvironmentSubdomain:
+    Type: String
+    Description: "E.g: dev.mysite.com | qa.mysite.com (just apply for no-prod environments)"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   
 Metadata:
   "AWS::CloudFormation::Interface":
@@ -67,17 +90,23 @@ Metadata:
       - Label:
           default: Repo information
         Parameters:
+          - gitProvider
           - frontendRepository
           - repositoryBranch
+      - Label:
+          default: Deploy information
+        Parameters:
+          - buildInstanceComputeType
           - startPipelineOnChange
       - Label:
           default: Domain information
         Parameters:
-          - hostedZoneName
-          - hostedZoneId
+          - rootHostedZoneName
+          - rootHostedZoneId
           - frontendSubdomain
+          - useEnvironmentSubdomain
       - Label:
-          default: Bucket information
+          default: CFN information
         Parameters:
           - cfnBucketName
     ParameterLabels:
@@ -87,40 +116,69 @@ Metadata:
         default: "Project's environment:"
       cfnBucketName:
         default: "Cloudformation bucket:"
+      gitProvider:
+        default: "Git provider:"
       frontendRepository:
         default: "Website repository:"
       repositoryBranch:
         default: "Repository branch:"
+      buildInstanceComputeType:
+        default: "Build instance Compute type:"
       startPipelineOnChange:
         default: "Start pipeline on change?"
       frontendSubdomain:
-        default: "Subdomain:"
-      hostedZoneName:
-        default: "Domain name:"
-      hostedZoneId:
-        default: "Hosted zone Id:"
+        default: "Website subdomain:"
+      rootHostedZoneName:
+        default: "Root hosted zone (domain) name:"
+      rootHostedZoneId:
+        default: "Root hosted zone id:"
+      useEnvironmentSubdomain:
+        default: "Create environment subdomain:"
+Conditions:
+  isNonProd: !Not 
+    - !Equals 
+      - !Ref environment
+      - prod
+  isProd: !Equals 
+    - !Ref environment
+    - prod
+  useEnvSubdomain: !Equals 
+    - !Ref useEnvironmentSubdomain
+    - "true"
+  createHostedZone: !And 
+    - !Condition isNonProd
+    - !Condition useEnvSubdomain
 Resources:
   WebsiteBucket:
     Type: AWS::CloudFormation::Stack
     Properties: 
       TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/s3.yml
       Parameters: 
-        bucketName: !Sub ${project}-${environment}-website-${AWS::Region}
+        bucketName: !Sub ${project}-${environment}-website-${frontendSubdomain}-${AWS::Region}
 
   PipelineBucket:
     Type: AWS::CloudFormation::Stack
     Properties: 
       TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/s3.yml
       Parameters: 
-        bucketName: !Sub ${project}-${environment}-pipeline-${AWS::Region}
+        bucketName: !Sub ${project}-${environment}-pipeline-${frontendSubdomain}-${AWS::Region}
+
+  HostedZone:
+    Type: AWS::CloudFormation::Stack
+    Condition: createHostedZone
+    Properties: 
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/route53.yml
+      Parameters: 
+        hostedZoneName: !Sub '${environment}.${rootHostedZoneName}'
+        parentHostedZoneId: !Ref rootHostedZoneId
   
   Certificate:
     Type: AWS::CloudFormation::Stack
     Properties: 
       TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/acm.yml
       Parameters: 
-        hostedZoneName: !Ref hostedZoneName
-        hostedZoneId: !Ref hostedZoneId
+        hostedZoneName: !If [createHostedZone, !Sub '${environment}.${rootHostedZoneName}', !Ref rootHostedZoneName]
+        hostedZoneId: !If [createHostedZone, !GetAtt HostedZone.Outputs.hostedZoneId, !Ref rootHostedZoneId]
 
   GitConnection:
     Type: AWS::CloudFormation::Stack
@@ -128,6 +186,8 @@ Resources:
       TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/codestar.yml
       Parameters: 
         project: !Ref project
+        environment: !Ref environment
+        gitProvider: !Ref gitProvider
 
   Distribution:
     Type: AWS::CloudFormation::Stack
@@ -136,9 +196,9 @@ Resources:
       Parameters: 
         bucketName: !GetAtt WebsiteBucket.Outputs.bucketName
         bucketDomainName: !GetAtt WebsiteBucket.Outputs.bucketDomainName
-        domain: !Ref hostedZoneName
+        domain: !If [createHostedZone, !Sub '${environment}.${rootHostedZoneName}', !Ref rootHostedZoneName]
         subdomain: !Ref frontendSubdomain
-        hostedZoneId: !Ref hostedZoneId
+        hostedZoneId: !If [createHostedZone, !GetAtt HostedZone.Outputs.hostedZoneId, !Ref rootHostedZoneId]
         certificateARN: !GetAtt Certificate.Outputs.certificateARN
 
   Pipeline:
@@ -148,10 +208,12 @@ Resources:
       Parameters: 
         project: !Ref project
         environment: !Ref environment
-        startOnChange: !Ref startPipelineOnChange
+        subdomain: !Ref frontendSubdomain
+        automaticDeploy: !Ref startPipelineOnChange
         cfnBucketName: !Ref cfnBucketName
         frontendRepository: !Ref frontendRepository
         repositoryBranch: !Ref repositoryBranch
         deploymentBucketName: !GetAtt WebsiteBucket.Outputs.bucketName
         artifactsBucketName: !GetAtt PipelineBucket.Outputs.bucketName
         gitConnectionARN: !GetAtt GitConnection.Outputs.gitConnectionARN
+        buildInstanceComputeType: !Ref buildInstanceComputeType

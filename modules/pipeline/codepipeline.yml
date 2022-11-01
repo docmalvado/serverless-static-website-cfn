@@ -12,13 +12,8 @@ Parameters:
       - dev
       - qa
       - prod
-  startOnChange:
+  subdomain:
     Type: String
-    Description: Start pipeline on git commit
-    Default: "false"
-    AllowedValues:
-      - "true"
-      - "false"
   artifactsBucketName:
     Type: String
   repositoryName:
@@ -32,13 +27,19 @@ Parameters:
     Type: String
   buildProjectName:
     Type: String
-  deploymentBucketName:
+  deploymentBucket:
     Type: String
+  automaticDeploy:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
 Resources:
   CodePipelineProject:
     Type: AWS::CodePipeline::Pipeline
     Properties: 
-      Name: !Sub ${project}-${environment}-frontend-pipeline
+      Name: !Sub ${project}-${environment}-website-${subdomain}-pipeline
       ArtifactStore:
         Location: !Ref artifactsBucketName
         Type: S3
@@ -58,7 +59,7 @@ Resources:
                 FullRepositoryId: !Ref repositoryName
                 BranchName: !Ref repositoryBranch
                 OutputArtifactFormat: "CODEBUILD_CLONE_REF"
-                DetectChanges: !Ref startOnChange
+                DetectChanges: !Ref automaticDeploy
               RunOrder: 1
               OutputArtifacts:
                 - Name: Source
@@ -88,7 +89,7 @@ Resources:
                 Provider: S3
                 Version: 1
               Configuration:
-                BucketName: !Ref deploymentBucketName
+                BucketName: !Ref deploymentBucket
                 Extract: 'true'
                 # ObjectKey: v1
               RunOrder: 1

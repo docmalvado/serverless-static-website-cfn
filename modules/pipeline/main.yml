@@ -13,13 +13,8 @@ Parameters:
       - dev
       - qa
       - prod
-  startOnChange:
+  subdomain:
     Type: String
-    Description: Start pipeline on git commit
-    Default: "false"
-    AllowedValues:
-      - "true"
-      - "false"
   cfnBucketName:
     Type: String
     Description: Bucket that store cfn modules
@@ -28,44 +23,62 @@ Parameters:
   repositoryBranch:
     Type: String
     Default: main
-  deploymentBucketName:
-    Type: String
   artifactsBucketName:
     Type: String
-  gitConnectionARN:
+  deploymentBucket:
     Type: String
+  gitConnectionArn:
+    Type: String
+  automaticDeploy:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  buildInstanceComputeType:
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+      - BUILD_GENERAL1_2XLARGE
 Resources:
   Permissions:
     Type: AWS::CloudFormation::Stack
     Properties: 
-      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/iam.yml
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/frontend/modules/pipeline/iam.yml
       Parameters: 
         project: !Ref project
         environment: !Ref environment
+        subdomain: !Ref subdomain
         artifactsBucketName: !Ref artifactsBucketName
-        deploymentBucketName: !Ref deploymentBucketName
+        deploymentBucketName: !Ref deploymentBucket
 
   BuildProject:
     Type: AWS::CloudFormation::Stack
     Properties: 
-      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/codebuild.yml
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/frontend/modules/pipeline/codebuild.yml
       Parameters: 
         project: !Ref project
         environment: !Ref environment
+        subdomain: !Ref subdomain
+        computeType: !Ref buildInstanceComputeType
         codeBuildRoleArn: !GetAtt Permissions.Outputs.buildRoleArn
         
   PipelineProject:
     Type: AWS::CloudFormation::Stack
     Properties: 
-      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/modules/pipeline/codepipeline.yml
+      TemplateURL: !Sub https://s3.amazonaws.com/${cfnBucketName}/${project}/frontend/modules/pipeline/codepipeline.yml
       Parameters: 
         project: !Ref project
         environment: !Ref environment
-        startOnChange: !Ref startOnChange
+        subdomain: !Ref subdomain
         artifactsBucketName: !Ref artifactsBucketName
         repositoryName: !Ref frontendRepository
         repositoryBranch: !Ref repositoryBranch
         codePipelineRoleArn: !GetAtt Permissions.Outputs.pipelineRoleArn
-        gitConnectionArn: !Ref gitConnectionARN
+        gitConnectionArn: !Ref gitConnectionArn
         buildProjectName: !GetAtt BuildProject.Outputs.codeBuildProjectName
-        deploymentBucketName: !Ref deploymentBucketName
+        deploymentBucket: !Ref deploymentBucket
+        automaticDeploy: !Ref automaticDeploy

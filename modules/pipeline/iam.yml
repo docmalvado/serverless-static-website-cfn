@@ -11,6 +11,8 @@ Parameters:
       - dev
       - qa
       - prod
+  subdomain:
+    Type: String
   artifactsBucketName:
     Type: String
   deploymentBucketName:
@@ -88,7 +90,7 @@ Resources:
   CommonPolicies:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub ${project}-${environment}-common-policies
+      PolicyName: !Sub ${project}-${environment}-${subdomain}-common-policies
       PolicyDocument:
         Version: 2012-10-17
         Statement:

@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  hostedZoneName:
+    Type: String
+    Description: Hosted Zone Name
+  parentHostedZoneId:
+    Type: String
+    Description: Parent Hosted Zone Id
+Resources:
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Ref hostedZoneName
+
+  HostedZoneAlias:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref parentHostedZoneId
+      Name: !Ref hostedZoneName
+      Type: NS
+      TTL: '300'
+      ResourceRecords: !GetAtt HostedZone.NameServers
+Outputs:
+  hostedZoneId:
+    Value: !Ref HostedZone

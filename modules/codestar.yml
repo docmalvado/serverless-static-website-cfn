@@ -3,12 +3,23 @@ Parameters:
   project:
     Type: String
     Description: Project's name
+  environment:
+    Type: String
+    Description: Project's environment
+  gitProvider:
+    Type: String
+    Description: Git provider
+    Default: GitHub
+    AllowedValues:
+      - GitHub
+      - Bitbucket
+      - GitHubEnterpriseServer
 Resources:
   GitConnection:
     Type: AWS::CodeStarConnections::Connection
     Properties:
-      ConnectionName: !Sub ${project}-git-connection
-      ProviderType: GitHub
+      ConnectionName: !Sub ${project}-${environment}-git-connection
+      ProviderType: !Ref gitProvider
 Outputs:
   gitConnectionARN:
     Value: !Ref GitConnection

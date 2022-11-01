@@ -12,19 +12,29 @@ Parameters:
       - dev
       - qa
       - prod
+  subdomain:
+    Type: String
+  computeType:
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
+      - BUILD_GENERAL1_2XLARGE
   codeBuildRoleArn:
     Type: String
 Resources:
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties: 
-      Name: !Sub ${project}-${environment}-frontend-build
+      Name: !Sub ${project}-${environment}-website-${subdomain}-build
       Description: Build project
       Artifacts: 
         Type: CODEPIPELINE
       BadgeEnabled: False
       Environment: 
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: !Ref computeType
         Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: True
