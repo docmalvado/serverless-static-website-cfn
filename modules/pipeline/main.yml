@@ -15,6 +15,9 @@ Parameters:
       - prod
   subdomain:
     Type: String
+  buildSpecPath:
+    Type: String
+    Default: buildspec.yml
   cfnBucketName:
     Type: String
     Description: Bucket that store cfn modules
@@ -63,6 +66,7 @@ Resources:
         project: !Ref project
         environment: !Ref environment
         subdomain: !Ref subdomain
+        buildSpecPath: !Ref buildSpecPath
         computeType: !Ref buildInstanceComputeType
         codeBuildRoleArn: !GetAtt Permissions.Outputs.buildRoleArn
         

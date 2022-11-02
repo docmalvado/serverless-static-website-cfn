@@ -55,6 +55,10 @@ Parameters:
       - BUILD_GENERAL1_MEDIUM
       - BUILD_GENERAL1_LARGE
       - BUILD_GENERAL1_2XLARGE
+  buildSpecPath:
+    Type: String
+    Description: "Repo root relative path"
+    Default: buildspec.yml
   frontendSubdomain:
     Type: String
     Description: "Subdomain for the frontend, E.g: www"
@@ -94,9 +98,10 @@ Metadata:
           - frontendRepository
           - repositoryBranch
       - Label:
-          default: Deploy information
+          default: Pipeline information
         Parameters:
           - buildInstanceComputeType
+          - buildSpecPath
           - startPipelineOnChange
       - Label:
           default: Domain information
@@ -124,6 +129,8 @@ Metadata:
         default: "Repository branch:"
       buildInstanceComputeType:
         default: "Build instance Compute type:"
+      buildSpecPath:
+        default: "Build spec file path:"
       startPipelineOnChange:
         default: "Start pipeline on change?"
       frontendSubdomain:
@@ -213,6 +220,7 @@ Resources:
         cfnBucketName: !Ref cfnBucketName
         frontendRepository: !Ref frontendRepository
         repositoryBranch: !Ref repositoryBranch
+        buildSpecPath: !Ref buildSpecPath
         deploymentBucketName: !GetAtt WebsiteBucket.Outputs.bucketName
         artifactsBucketName: !GetAtt PipelineBucket.Outputs.bucketName
         gitConnectionARN: !GetAtt GitConnection.Outputs.gitConnectionARN

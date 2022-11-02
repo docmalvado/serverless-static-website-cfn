@@ -14,6 +14,9 @@ Parameters:
       - prod
   subdomain:
     Type: String
+  buildSpecPath:
+    Type: String
+    Default: buildspec.yml
   computeType:
     Type: String
     Default: BUILD_GENERAL1_SMALL
@@ -43,7 +46,7 @@ Resources:
       ServiceRole: !Ref codeBuildRoleArn
       Source:
         Type: CODEPIPELINE
-        BuildSpec: buildspec.yml
+        BuildSpec: !Ref buildSpecPath
       TimeoutInMinutes: 60
       Visibility: PRIVATE
 
